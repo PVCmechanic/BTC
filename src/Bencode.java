@@ -36,6 +36,9 @@ public class Bencode {
                         int e = Integer.valueOf(new String(Arrays.copyOfRange(input2,0, p)));
                         out.add(bdecode(Arrays.copyOfRange(input2,0,e)));
                     }
+                    if(p==input2.length){
+                        running = false;
+                    }
 
                 }
                 return out;
