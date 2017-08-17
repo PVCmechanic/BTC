@@ -18,30 +18,39 @@ public class Bencode {
         System.out.println(input2.length);
         System.out.println(in);
         if(input2[0] >= '0' && input2[0] <='9'){
-
+            int pointer = 1;
+            while(input2[pointer] != ':'){
+                pointer++;
+            }
+            int length = Integer.valueOf(new String(Arrays.copyOfRange(input2,0, pointer)));
+            byte[] out = Arrays.copyOfRange(input2,pointer,pointer + length + 1);
+            return out;
         }else{
-            input2 = Arrays.copyOfRange(input2,1,input2.length-1);
             System.out.println(input2.length);
             if(input2[0] == 'l'){
+                input2 = Arrays.copyOfRange(input2,1,input2.length-1);
                 List out = new ArrayList();
                 boolean running = true;
                 while(running){
-                    int p = 1;
+                    int pointer = 1;
                     if(input2[0] == 'i' || input2[0] == 'd' || input2[0] == 'l'){
-                        while(input2[p++] != 'e');
-                        out.add(bdecode(Arrays.copyOfRange(input2,0,p)));
-                        input2 = Arrays.copyOfRange(input2,p,input2.length);
+                        while(input2[pointer]!='e'){
+                            pointer++;
+                        }
+                        out.add(bdecode(Arrays.copyOfRange(input2,0,pointer)));
+                        input2 = Arrays.copyOfRange(input2,pointer,input2.length);
                     }else{
-                        while(input2[p++] != ':');
-                        int e = Integer.valueOf(new String(Arrays.copyOfRange(input2,0, p)));
-                        out.add(bdecode(Arrays.copyOfRange(input2,0,e)));
+                        while(input2[pointer] != ':'){
+                            pointer++;
+                        }
+                        int length = Integer.valueOf(new String(Arrays.copyOfRange(input2,0, pointer)));
+                        out.add(bdecode(Arrays.copyOfRange(input2,0,length + pointer + 1)));
+                        input2 = Arrays.copyOfRange(input2,length + pointer + 1, input2.length);
                     }
-                    if(p==input2.length){
-                        running = false;
+                    if(input2.length == 0){
+                        return out;
                     }
-
                 }
-                return out;
             }else if(input2[0] == 'i'){
 
             }else if(input2[0] == 'd'){
