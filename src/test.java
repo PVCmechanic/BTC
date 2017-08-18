@@ -6,10 +6,12 @@ import java.util.HashMap;
 public class test {
     public static void main(String[] args) {
         Bencode bencode = new Bencode();
-        byte[] arr = {11,32,41};
+            byte[] arr = "l5:helloi52ee".getBytes();
 
         try {
-            bencode.bdecode(arr);
+            Object thing = bencode.bdecode(arr);
+            System.out.println(thing);
+
         } catch (IOException e) {
             e.printStackTrace();
         }
