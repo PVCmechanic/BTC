@@ -31,12 +31,34 @@ public class Bencode {
                 boolean running = true;
                 while (running) {
                     int pointer = 1;
-                    if (input2[0] == 'i' || input2[0] == 'd' || input2[0] == 'l') {
+                    if (input2[0] == 'i') {
                         while (input2[pointer] != 'e') {
                             pointer++;
                         }
-                        out.add(bdecode(Arrays.copyOfRange(input2, 0, pointer)));
+                        out.add(bdecode(Arrays.copyOfRange(input2, 0, pointer + 1)));
                         input2 = Arrays.copyOfRange(input2, pointer + 1, input2.length);
+                    } else if (input2[0] == 'd' || input2[0] == 'l') {
+                        int indent = 0;
+                        boolean searching = true;
+                        while (searching) {
+                            if (input2[pointer] == 'i' || input2[pointer] == 'l' || input2[pointer] == 'd') {
+                                indent++;
+                            } else if (input2[pointer] == 'e') {
+                                indent--;
+                                if (indent == -1) {
+                                    searching = false;
+                                }
+                            } else if(indent == 0){
+                                int newpoint = pointer;
+                                while (input2[newpoint] != ':') {
+                                    newpoint++;
+                                }
+                                pointer = newpoint + Integer.valueOf(new String(Arrays.copyOfRange(input2, pointer, newpoint)));
+                            }
+                            pointer++;
+                        }
+                        out.add(bdecode(Arrays.copyOfRange(input2,0,pointer)));
+                        input2 = Arrays.copyOfRange(input2,pointer,input2.length);
                     } else {
                         while (input2[pointer] != ':') {
                             pointer++;
