@@ -12,10 +12,10 @@ public class Bencode {
     }
 
     public Object bdecode(byte[] input2) throws IOException {
-        InputStream inputStream = new FileInputStream("C:\\Users\\Max\\Documents\\BitTorrentClient\\NPR_1_archive.torrent");
+        /*InputStream inputStream = new FileInputStream("C:\\Users\\Max\\Documents\\BitTorrentClient\\NPR_1_archive.torrent");
 
-        byte[] inputa2 = IOUtils.toByteArray(inputStream);
-
+        byte[] input2 = IOUtils.toByteArray(inputStream);
+        */
         String in = new String(input2, "ISO-8859-1");
         if (input2[0] >= '0' && input2[0] <= '9') {
             int pointer = 1;
