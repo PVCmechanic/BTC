@@ -25,11 +25,11 @@ public class Bencode {
             int length = Integer.valueOf(new String(Arrays.copyOfRange(input2, 0, pointer)));
             return Arrays.copyOfRange(input2, pointer + 1, pointer + length + 1);
         } else {
-            if (input2[0] == 'l') {
+            if (input2[0] == 'l' || input2[0] == 'd') {
+                boolean list = input2[0] == 'l';
                 input2 = Arrays.copyOfRange(input2, 1, input2.length - 1);
                 List<Object> out = new ArrayList<>();
-                boolean running = true;
-                while (running) {
+                while (true) {
                     int pointer = 1;
                     if (input2[0] == 'i') {
                         while (input2[pointer] != 'e') {
@@ -48,7 +48,7 @@ public class Bencode {
                                 if (indent == -1) {
                                     searching = false;
                                 }
-                            } else if(indent == 0){
+                            } else if (indent == 0) {
                                 int newpoint = pointer;
                                 while (input2[newpoint] != ':') {
                                     newpoint++;
@@ -57,8 +57,8 @@ public class Bencode {
                             }
                             pointer++;
                         }
-                        out.add(bdecode(Arrays.copyOfRange(input2,0,pointer)));
-                        input2 = Arrays.copyOfRange(input2,pointer,input2.length);
+                        out.add(bdecode(Arrays.copyOfRange(input2, 0, pointer)));
+                        input2 = Arrays.copyOfRange(input2, pointer, input2.length);
                     } else {
                         while (input2[pointer] != ':') {
                             pointer++;
@@ -68,43 +68,20 @@ public class Bencode {
                         input2 = Arrays.copyOfRange(input2, length + pointer + 1, input2.length);
                     }
                     if (input2.length == 0) {
-                        return out;
+                        if (list) {
+                            return out;
+                        } else {
+                            HashMap<byte[], Object> map = new HashMap<>();
+                            for (int i = 0; i < out.size(); i += 2) {
+                                map.put((byte[]) out.get(i), out.get(i + 1));
+                            }
+                            return map;
+                        }
                     }
                 }
             } else if (input2[0] == 'i') {
                 return Integer.valueOf(new String(Arrays.copyOfRange(input2, 1, input2.length - 1)));
 
-            } else if (input2[0] == 'd') {
-                input2 = Arrays.copyOfRange(input2, 1, input2.length - 1);
-                HashMap<String, Object> out = new HashMap<>();
-                boolean running = true;
-                while (running) {
-                    int pointer = 1;
-                    while (input2[pointer] != ':') {
-                        pointer++;
-                    }
-                    int length = Integer.valueOf(new String(Arrays.copyOfRange(input2, 0, pointer)));
-                    String id = new String(Arrays.copyOfRange(input2, 0, length + pointer + 1));
-                    input2 = Arrays.copyOfRange(input2, length + pointer + 1, input2.length);
-                    pointer = 1;
-                    if (input2[0] == 'i' || input2[0] == 'd' || input2[0] == 'l') {
-                        while (input2[pointer] != 'e') {
-                            pointer++;
-                        }
-                        out.put(id, bdecode(Arrays.copyOfRange(input2, 0, pointer)));
-                        input2 = Arrays.copyOfRange(input2, pointer + 1, input2.length);
-                    } else {
-                        while (input2[pointer] != ':') {
-                            pointer++;
-                        }
-                        length = Integer.valueOf(new String(Arrays.copyOfRange(input2, 0, pointer)));
-                        out.put(id, bdecode(Arrays.copyOfRange(input2, 0, length + pointer + 1)));
-                        input2 = Arrays.copyOfRange(input2, length + pointer + 1, input2.length);
-                    }
-                    if (input2.length == 0) {
-                        return out;
-                    }
-                }
             }
         }
 
