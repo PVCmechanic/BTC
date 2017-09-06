@@ -4,70 +4,75 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
-import org.apache.commons.io.IOUtils;
-
-
 public class Bencode {
-    public Bencode() {
+    public Bencode() {}
+
+    public byte[] bencode(Object input){
+        if(input instanceof Integer){
+            byte[] num = input.toString().getBytes();
+            byte[] out = new byte[num.length + 2];
+            out[0]='i';
+            for(int i=0;i<num.length;i++){
+                out[i+1]=num[i];
+            }
+            out[out.length-1]='e';
+
+
+        }
     }
 
-    public Object bdecode(byte[] input2) throws IOException {
-        /*InputStream inputStream = new FileInputStream("C:\\Users\\Max\\Documents\\BitTorrentClient\\NPR_1_archive.torrent");
-
-        byte[] input2 = IOUtils.toByteArray(inputStream);
-        */
-        String in = new String(input2, "ISO-8859-1");
-        if (input2[0] >= '0' && input2[0] <= '9') {
+    public Object bdecode(byte[] input) throws IOException {
+        if (input[0] >= '0' && input[0] <= '9') {
             int pointer = 1;
-            while (input2[pointer] != ':') {
+            while (input[pointer] != ':') {
                 pointer++;
             }
-            int length = Integer.valueOf(new String(Arrays.copyOfRange(input2, 0, pointer)));
-            return Arrays.copyOfRange(input2, pointer + 1, pointer + length + 1);
+            int length = Integer.valueOf(new String(Arrays.copyOfRange(input, 0, pointer)));
+            return Arrays.copyOfRange(input, pointer + 1, pointer + length + 1);
         } else {
-            if (input2[0] == 'l' || input2[0] == 'd') {
-                boolean list = input2[0] == 'l';
-                input2 = Arrays.copyOfRange(input2, 1, input2.length - 1);
+            if (input[0] == 'l' || input[0] == 'd') {
+                boolean list = input[0] == 'l';
+                input = Arrays.copyOfRange(input, 1, input.length - 1);
                 List<Object> out = new ArrayList<>();
                 while (true) {
                     int pointer = 1;
-                    if (input2[0] == 'i') {
-                        while (input2[pointer] != 'e') {
+                    if (input[0] == 'i') {
+                        while (input[pointer] != 'e') {
                             pointer++;
                         }
-                        out.add(bdecode(Arrays.copyOfRange(input2, 0, pointer + 1)));
-                        input2 = Arrays.copyOfRange(input2, pointer + 1, input2.length);
-                    } else if (input2[0] == 'd' || input2[0] == 'l') {
+                        out.add(bdecode(Arrays.copyOfRange(input, 0, pointer + 1)));
+                        input = Arrays.copyOfRange(input, pointer + 1, input.length);
+                    } else if (input[0] == 'd' || input[0] == 'l') {
                         int indent = 0;
                         boolean searching = true;
                         while (searching) {
-                            if (input2[pointer] == 'i' || input2[pointer] == 'l' || input2[pointer] == 'd') {
+                            if (input[pointer] == 'i' || input[pointer] == 'l' || input[pointer] == 'd') {
                                 indent++;
-                            } else if (input2[pointer] == 'e') {
+                            } else if (input[pointer] == 'e') {
                                 indent--;
                                 if (indent == -1) {
                                     searching = false;
                                 }
                             } else if (indent == 0) {
                                 int newpoint = pointer;
-                                while (input2[newpoint] != ':') {
+                                while (input[newpoint] != ':') {
                                     newpoint++;
                                 }
-                                pointer = newpoint + Integer.valueOf(new String(Arrays.copyOfRange(input2, pointer, newpoint)));
+                                pointer = newpoint + Integer.valueOf(new String(Arrays.copyOfRange(input, pointer, newpoint)));
                             }
                             pointer++;
                         }
-                        out.add(bdecode(Arrays.copyOfRange(input2, 0, pointer)));
-                        input2 = Arrays.copyOfRange(input2, pointer, input2.length);
+                        out.add(bdecode(Arrays.copyOfRange(input, 0, pointer)));
+                        input = Arrays.copyOfRange(input, pointer, input.length);
                     } else {
-                        while (input2[pointer] != ':') {
+                        while (input[pointer] != ':') {
                             pointer++;
                         }
-                        int length = Integer.valueOf(new String(Arrays.copyOfRange(input2, 0, pointer)));
-                        out.add(bdecode(Arrays.copyOfRange(input2, 0, length + pointer + 1)));
-                        input2 = Arrays.copyOfRange(input2, length + pointer + 1, input2.length);
+                        int length = Integer.valueOf(new String(Arrays.copyOfRange(input, 0, pointer)));
+                        out.add(bdecode(Arrays.copyOfRange(input, 0, length + pointer + 1)));
+                        input = Arrays.copyOfRange(input, length + pointer + 1, input.length);
                     }
-                    if (input2.length == 0) {
+                    if (input.length == 0) {
                         if (list) {
                             return out;
                         } else {
@@ -79,8 +84,8 @@ public class Bencode {
                         }
                     }
                 }
-            } else if (input2[0] == 'i') {
-                return Integer.valueOf(new String(Arrays.copyOfRange(input2, 1, input2.length - 1)));
+            } else if (input[0] == 'i') {
+                return Integer.valueOf(new String(Arrays.copyOfRange(input, 1, input.length - 1)));
 
             }
         }
