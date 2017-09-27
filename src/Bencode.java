@@ -29,16 +29,38 @@ public class Bencode {
             }
             byte[] out = new byte[outLen];
             out[0]='l';
-            out[outLen]='e';
+            out[outLen-1]='e';
             int pointer=1;
             for(int i=0;i<outPieces.size();i++){
                 for(int j=0;j<outPieces.get(i).length;j++){
                     out[pointer]=outPieces.get(i)[j];
+                    pointer++;
                 }
             }
             return out;
         }else if(input instanceof HashMap){
-            return null;
+            ArrayList<byte[]> outPieces = new ArrayList<>();
+            Object[] keys = ((HashMap) input).keySet().toArray();
+            Object[] values = ((HashMap)input).values().toArray();
+            for(int i=0;i<keys.length;i++){
+                outPieces.add(bencode(keys[i]));
+                outPieces.add(bencode(values[i]));
+            }
+            int outLen= 2;
+            for(int i=0;i<outPieces.size();i++){
+                outLen+=outPieces.get(i).length;
+            }
+            byte[] out = new byte[outLen];
+            out[0]='d';
+            out[outLen-1]='e';
+            int pointer=1;
+            for(int i=0;i<outPieces.size();i++){
+                for(int j=0;j<outPieces.get(i).length;j++){
+                    out[pointer]=outPieces.get(i)[j];
+                    pointer++;
+                }
+            }
+            return out;
         }else if(input instanceof byte[]){
             int len = ((byte[]) input).length;
             int lenlen = String.valueOf(len).length();
