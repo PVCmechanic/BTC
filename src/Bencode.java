@@ -7,7 +7,7 @@ import java.util.List;
 public class Bencode {
     public Bencode() {}
 
-    public byte[] bencode(Object input){
+    public byte[] bencode(Object input) throws IllegalArgumentException{
         if(input instanceof Integer){
             byte[] num = input.toString().getBytes();
             byte[] out = new byte[num.length + 2];
@@ -16,8 +16,43 @@ public class Bencode {
                 out[i+1]=num[i];
             }
             out[out.length-1]='e';
-
-
+            return out;
+        }else if(input instanceof ArrayList){
+            List<byte[]> outPieces = new ArrayList();
+            Object[] parts = ((ArrayList) input).toArray();
+            for(int i=0;i<parts.length;i++){
+                outPieces.add(bencode(parts[i]));
+            }
+            int outLen= 2;
+            for(int i=0;i<outPieces.size();i++){
+                outLen+=outPieces.get(i).length;
+            }
+            byte[] out = new byte[outLen];
+            out[0]='l';
+            out[outLen]='e';
+            int pointer=1;
+            for(int i=0;i<outPieces.size();i++){
+                for(int j=0;j<outPieces.get(i).length;j++){
+                    out[pointer]=outPieces.get(i)[j];
+                }
+            }
+            return out;
+        }else if(input instanceof HashMap){
+            return null;
+        }else if(input instanceof byte[]){
+            int len = ((byte[]) input).length;
+            int lenlen = String.valueOf(len).length();
+            byte[] out = new byte[len+lenlen+1];
+            for(int i=0;i<lenlen;i++){
+                out[i]=(byte)String.valueOf(len).charAt(i);
+            }
+            out[lenlen]=':';
+            for(int i=lenlen+1;i<out.length;i++){
+                out[i]=((byte[])input)[i-lenlen-1];
+            }
+            return out;
+        }else{
+            throw new IllegalArgumentException();
         }
     }
 
