@@ -25,38 +25,55 @@ public class FileManager {
 
   public FileManager(int pieceLength, byte[] pieceHashes, String fname, int flen)
       throws NoSuchAlgorithmException, IOException {
-    this.fname = fname;
+
     digest = MessageDigest.getInstance("SHA-1");
+    this.fname = fname;
+    this.pieceLength = pieceLength;
+    this.pieceHashes = pieceHashes;
+    numPieces = pieceHashes.length / 20;
     outFile = new RandomAccessFile(fname, "rw");
     outFile.setLength(flen);
-    this.pieceLength = pieceLength;
-    numPieces = pieceHashes.length / 20;
+    subRatio = pieceLength / SUBPIECELENGTH;
+    lastPieceLength = flen % pieceLength;
+    lastSubpiece = flen / SUBPIECELENGTH;
+    lastSubpieceLength = flen % SUBPIECELENGTH;
     int bitfieldLength = flen / (pieceLength * 8);
     if (flen % (pieceLength * 8) != 0) {
       bitfieldLength++;
     }
     bitfield = new byte[bitfieldLength];
-    subRatio = pieceLength / SUBPIECELENGTH;
     int subBitfieldLength = bitfieldLength * subRatio;
     subBitfield = new byte[subBitfieldLength];
+
+    // Initialize the subBitfield to 1s to check the file
+    for (int i = 0; i < subBitfieldLength; i++) {
+      subBitfield[i] = -1;
+    }
+    checkFile();
+
+    // Generate and randomize the list of required pieces
     pieceOrder = new LinkedList<>();
     int numSubpieces = flen / SUBPIECELENGTH;
     if (flen % SUBPIECELENGTH != 0) {
       numSubpieces++;
     }
     for (int i = 0; i < numSubpieces; i++) {
-      pieceOrder.add(i);
+      if (((subBitfield[i / 8] >> (i % 8)) & 1) == 0) {
+        pieceOrder.add(i);
+      }
     }
     Collections.shuffle(pieceOrder);
-    this.pieceHashes = pieceHashes;
-    lastSubpiece = flen / SUBPIECELENGTH;
-    lastSubpieceLength = flen % SUBPIECELENGTH;
-    lastPieceLength = flen % pieceLength;
+
     System.out.printf(
         "Bitfield length: %d, Subbitfield length: %d, Pieces: %d\n",
         bitfieldLength, subBitfieldLength, numPieces);
   }
 
+  /**
+   * Get a subpiece that is still needed to complete the file
+   *
+   * @return The index of a missing subpiece, -1 if all subpieces are downloaded
+   */
   public synchronized int getRequest() {
     if (pieceOrder.isEmpty()) {
       return -1;
@@ -64,6 +81,11 @@ public class FileManager {
     return pieceOrder.remove();
   }
 
+  /**
+   *
+   * @param index The index of the piece to be checked
+   * @return If the piece exists
+   */
   public synchronized boolean hasPiece(int index) {
     return ((bitfield[index / 8] >> (index % 8)) & 1) == 1;
   }
@@ -88,6 +110,16 @@ public class FileManager {
     return lastSubpieceLength;
   }
 
+  /**
+   * Updates a subpiece of the file. May take arbitrarily sized data, but 16 kB of data is expected
+   * per the protocol. If a piece fails to validate, the corresponding subpiece indices are re-added
+   * to the list if required pieces.
+   *
+   * @param index The index of the piece to be updated
+   * @param offset The offset within the piece to start updating from
+   * @param data The data to write
+   * @return If the overall piece is complete
+   */
   public synchronized boolean setPiece(int index, int offset, byte[] data) {
     int subIndex = offset / SUBPIECELENGTH;
     try {
@@ -95,9 +127,12 @@ public class FileManager {
       outFile.write(data);
       subBitfield[(index * subRatio + subIndex) / 8] |= (1 << (index * subRatio + subIndex) % 8);
       if (!verifyPiece(index)) {
+        // ************************WRONG
         pieceOrder.add(index * subRatio + offset);
+        //pieceOrder is diff format
       }
-      if(status == 1) {
+      if (status == 1) {
+        // Sanity check, should return true
         return checkFile();
       }
       return false;
@@ -110,6 +145,15 @@ public class FileManager {
     }
   }
 
+  /**
+   * Read a section of data from the file. The specified section must have already been successfully
+   * downloaded and validated. Does not enforce the 16 kB request standard.
+   *
+   * @param index The index of the requested piece
+   * @param offset The offset within the piece to start reading from
+   * @param length The amount of data to read
+   * @return A byte array containing the requested data
+   */
   public synchronized byte[] readPiece(int index, int offset, int length) {
     if (((bitfield[index / 8] >> (index % 8)) & 1) == 1) {
       try {
@@ -133,6 +177,15 @@ public class FileManager {
     throw new IllegalArgumentException();
   }
 
+  /**
+   * Checks a piece against the corresponding hash. If the piece is not fully downloaded, no action
+   * will be taken. Updates the bitfield if the piece validates, otherwise it resets the
+   * corresponding sub-bitfield bits.
+   * @param index The index to be validated
+   * @return True if the piece successfully validates or the piece is incomplete, false if the piece
+   * fails validation
+   * @throws IOException The file is invalid
+   */
   private boolean verifyPiece(int index) throws IOException {
     int dataLength;
     if (index == numPieces - 1) {
@@ -177,20 +230,22 @@ public class FileManager {
       }
     }
     System.out.printf("------------------- %02d%% complete\n", count * 100 / numPieces);
-    status = count/numPieces;
+    status = count / numPieces;
   }
 
   private boolean checkFile() throws IOException {
     boolean toRet = true;
     for (int i = 0; i < numPieces; i++) {
       if (!verifyPiece(i)) {
-        bitfield[i / 8] |= (1 << (7 - i % 8));
+        bitfield[i / 8] &= ~(1 << (i % 8));
         toRet = false;
       }
     }
-    System.out.println("********************");
-    System.out.printf("Finished downloading %s\n", fname);
-    System.out.println("********************");
+    if (toRet) {
+      System.out.println("********************");
+      System.out.printf("Finished downloading %s\n", fname);
+      System.out.println("********************");
+    }
     return toRet;
   }
 }

@@ -1,13 +1,10 @@
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
-import java.rmi.server.ExportException;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -46,7 +43,7 @@ public class BencodePeer implements Runnable {
     peerChoking = true;
     peerInterested = false;
     requests = new LinkedList<>();
-    time = System.currentTimeMillis();
+    time = 0;
     lastNew = -1;
     tens = 0;
     done = false;
@@ -98,14 +95,19 @@ public class BencodePeer implements Runnable {
           System.out.println("bad hash");
           throw new IOException();
         }
-        int len = 0;
+        int len;
+        int read = 0;
         byte[] lenBytes = new byte[4];
         while (true) {
-          in.readFully(lenBytes);
-          len = networkInt(lenBytes[0], lenBytes[1], lenBytes[2], lenBytes[3]);
-//          System.out.printf("%s length %d\n", ips, len);
-          if (len > 0) {
-            handleInput(in, len);
+
+          read += in.read(lenBytes, read, 4 - read);
+          if (read == 4) {
+            read = 0;
+            len = networkInt(lenBytes[0], lenBytes[1], lenBytes[2], lenBytes[3]);
+            System.out.printf("%s length %d\n", ips, len);
+            if (len > 0) {
+              handleInput(in, len);
+            }
           }
 
           // *******************
@@ -141,21 +143,15 @@ public class BencodePeer implements Runnable {
               }
             }
           }  // IF_DONE
-          /*
-          if (System.currentTimeMillis() - time > 10000) {
+          if (System.currentTimeMillis() - time > 5000) {
             time = System.currentTimeMillis();
             tens++;
-            if (tens >= 9) {
-              choke(out);
-              parent.decUnchoked();
-            }
-            if (parent.getUnchoked() < 5 || peerInterested) {
+            if ((parent.getUnchoked() < 4 || peerInterested) && choking) {
               choking = false;
               unchoke(out);
               parent.incUnchoked();
             }
           }
-          */
           Thread.sleep(10);
         }
       }
@@ -174,42 +170,48 @@ public class BencodePeer implements Runnable {
     }
   }
 
+  /**
+   * Interprets and handles a single bittorrent peer protocol packet
+   * @param in The socket to read from
+   * @param len The value of the length header
+   * @throws IOException The socket is invalid
+   */
   private void handleInput(DataInputStream in, int len) throws IOException {
     int messageId = in.read();
     byte[] data = new byte[len - 1];
     in.readFully(data);
-//    System.out.print("Received message ");
+    System.out.print("received ");
     switch (messageId) {
       case 0:
-//        System.out.printf("CHOKING from %s\n", ip);
+        System.out.println("choking");
         peerChoking = true;
         break;
       case 1:
-//        System.out.printf("UNCHOKING from %s\n", ip);
+        System.out.println("unchoking");
         peerChoking = false;
         break;
       case 2:
-//        System.out.printf("INTERESTED from %s\n", ip);
+        System.out.println("interested");
         peerInterested = true;
         break;
       case 3:
-//        System.out.printf("DISINTERESTED from %s\n", ip);
+        System.out.println("disinterested");
         peerInterested = false;
         break;
       case 4:
         {
+          System.out.println("have");
           int index = networkInt(data[0], data[1], data[2], data[3]);
           peerBitfield[index / 8] |= (1 << (index % 8));
-//          System.out.printf("HAVE from %s, Peer bitfield: %s\n", ip, Arrays.toString(peerBitfield));
           break;
         }
       case 5:
-//        System.out.printf("BITFIELD from %s\n", ip);
+        System.out.println("bitfield");
         peerBitfield = data;
         break;
       case 6:
         {
-//          System.out.printf("REQUEST from %s\n", ip);
+          System.out.println("request");
           int index = networkInt(data[0], data[1], data[2], data[3]);
           int offset = networkInt(data[4], data[5], data[6], data[7]);
           int length = networkInt(data[8], data[9], data[10], data[11]);
@@ -220,7 +222,7 @@ public class BencodePeer implements Runnable {
         }
       case 7:
         {
-//          System.out.printf("PIECE from %s\n", ip);
+          System.out.println("piece");
           int index = networkInt(data[0], data[1], data[2], data[3]);
           int offset = networkInt(data[4], data[5], data[6], data[7]);
           byte[] subpiece = Arrays.copyOfRange(data, 8, data.length);
@@ -229,7 +231,7 @@ public class BencodePeer implements Runnable {
         }
       case 8:
         {
-//          System.out.printf("CANCEL from %s\n", ip);
+          System.out.println("cancel");
           int index = networkInt(data[0], data[1], data[2], data[3]);
           int offset = networkInt(data[4], data[5], data[6], data[7]);
           int length = networkInt(data[8], data[9], data[10], data[11]);
@@ -292,12 +294,14 @@ public class BencodePeer implements Runnable {
   }
 
   private void piece(Request request, OutputStream out) throws IOException {
-    System.out.println("Sent PIECE");
+    System.out.printf("Sent PIECE, len: %d\n", request.length);
     byte[] data = mgr.readPiece(request.index, request.offset, request.length);
     ByteBuffer buffer = ByteBuffer.allocate(13 + data.length);
     buffer.putInt(9 + data.length);
     buffer.put((byte) 7);
-    buffer.put(data, 13, 13 + data.length);
+    buffer.putInt(request.index);
+    buffer.putInt(request.offset);
+    buffer.put(data);
     out.write(buffer.array());
   }
 

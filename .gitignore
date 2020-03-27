@@ -22,8 +22,9 @@ local.properties
 .idea/misc.xml
 .idea/tasks.xml
 out
-Thumbs.db
 
 #IntelliJ IDEA
 .idea
 *.iml
+/BitTorrentClient.iml
+/src/scratch.java
