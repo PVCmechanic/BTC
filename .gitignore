@@ -23,3 +23,7 @@ local.properties
 .idea/tasks.xml
 out
 Thumbs.db
+
+#IntelliJ IDEA
+.idea
+*.iml

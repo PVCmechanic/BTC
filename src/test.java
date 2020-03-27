@@ -1,16 +1,18 @@
+import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
+import java.security.NoSuchAlgorithmException;
 
 public class test {
     public static void main(String[] args) {
-        Bencode bencode = new Bencode();
-            byte[] arr = "li23ed3:abci54e11:aaaaaaaaaaali3ei4ei5eeei1ee".getBytes();
-
         try {
-            byte[] a = new byte[]{45,52,31,41};
-            byte[] out = bencode.bencode(a);
-            System.out.println(String.valueOf(out));
+            Bencode bencode = new Bencode(new File("twinprinces2.jpg.torrent"));
+            bencode.trackerConnect();
+            bencode.peerConnect();
         } catch (IllegalArgumentException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
     }
