@@ -7,9 +7,7 @@ import java.util.Arrays;
 
 public class scratch {
   public static void main(String[] args) {
-    ByteBuffer buf = ByteBuffer.allocate(17);
-    buf.putInt(13).put((byte)6).putInt(15).putInt(10).putInt(16384);
-    System.out.println(Arrays.toString(buf.array()));
+    System.out.println((byte)-1 & 0xff);
   }
 
   private static int networkInt(int a, int b, int c, int d) {

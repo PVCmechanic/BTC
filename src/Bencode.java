@@ -1,10 +1,9 @@
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.net.ServerSocket;
+import java.net.Socket;
 import org.apache.commons.io.IOUtils;
 
 import java.io.*;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.ByteBuffer;
@@ -31,14 +30,12 @@ public class Bencode {
   private String event;
   private long interval;
   private ExecutorService executor;
-  private RandomAccessFile outputFile;
-  private int subRatio;
   private MessageDigest digest;
-  private int numpieces;
   private int numunchoked;
-  private Queue<Integer> newPieces;
+  private final Object chokedLock;
   private int updated;
   private int threads;
+  private final Object threadsLock;
   private FileManager mgr;
 
   public Bencode() throws NoSuchAlgorithmException {
@@ -51,8 +48,10 @@ public class Bencode {
     executor = Executors.newCachedThreadPool();
     digest = MessageDigest.getInstance("SHA-1");
     numunchoked = 0;
+    chokedLock = new Object();
     updated = 0;
     threads = 0;
+    threadsLock = new Object();
 
     System.out.println(id);
   }
@@ -79,36 +78,44 @@ public class Bencode {
         announce, flen, pieces.length / 20, pieceLength);
   }
 
-  public byte[] getInfoHash() {
-    return infoHash;
-  }
-
   public String getID() {
     return id;
   }
 
-  public int getNumpieces() {
-    return numpieces;
+  public void incUnchoked() {
+    synchronized (chokedLock) {
+      numunchoked++;
+    }
   }
 
-  public int getSubRatio() {
-    return subRatio;
+  public void decUnchoked() {
+    synchronized (chokedLock) {
+      numunchoked--;
+    }
   }
 
-  public synchronized void incUnchoked() {
-    numunchoked++;
+  public int getUnchoked() {
+    synchronized (chokedLock) {
+      return numunchoked;
+    }
   }
 
-  public synchronized void decUnchoked() {
-    numunchoked--;
+  public void incThreads() {
+    synchronized (threadsLock) {
+      threads++;
+    }
   }
 
-  public synchronized int getUnchoked() {
-    return numunchoked;
+  public void decThreads() {
+    synchronized (threadsLock) {
+      threads--;
+    }
   }
 
-  public synchronized void decThreads() {
-    threads--;
+  public void sendHas(int index) {
+    for (BencodePeer peer : connections) {
+      peer.newPiece(index);
+    }
   }
 
   /**
@@ -153,25 +160,21 @@ public class Bencode {
           ByteBuffer buf = ByteBuffer.wrap(Arrays.copyOfRange(peersData, i + 4, i + 6));
           tmp.put("port", Integer.toString((int) buf.getChar()));
           tmp.put("peer_id", "");
-          if (!ip.equals("192.168.0.169")) {
-            System.out.printf("Peer %d: IP: %s, Port: %s\n", i, ip, tmp.get("port"));
+          if (!tmp.get("port").equals("6881")) {
+            System.out.printf("Peer %d: IP: %s, Port: %s\n", i/6, ip, tmp.get("port"));
             peers.add(tmp);
-          } else {
-            System.out.println("Rejected");
           }
         }
       } else {
         List<Map> peerList = (List) ((TreeMap) decoded).get("peers");
-        for (Map<String, > m : peerList) {
+        for (Map m : peerList) {
           Map<String, String> tmp = new HashMap<>();
           tmp.put("ip", new String((byte[]) m.get("ip")));
           tmp.put("port", m.get("port").toString());
           tmp.put("peer_id", "");
-          if (!tmp.get("ip").equals("192.168.0.169")) {
+          if (!tmp.get("port").equals("6881")) {
             System.out.printf("Peer: IP: %s, Port: %s\n", tmp.get("ip"), tmp.get("port"));
             peers.add(tmp);
-          } else {
-            System.out.println("Rejected");
           }
         }
       }
@@ -188,10 +191,29 @@ public class Bencode {
     for (Map<String, String> peer : peers) {
       InetSocketAddress peerAddr =
           new InetSocketAddress(peer.get("ip"), Integer.parseInt(peer.get("port")));
-      BencodePeer peerCon = new BencodePeer(peerAddr, infoHash, id.getBytes(), this, mgr);
-      connections.add(peerCon);
-      threads++;
-      executor.submit(peerCon);
+      try {
+        BencodePeer peerCon = new BencodePeer(peerAddr, infoHash, id.getBytes(), this, mgr);
+        connections.add(peerCon);
+        incThreads();
+        executor.submit(peerCon);
+      } catch (IOException e) {
+        System.out.printf("Peer %s timed out\n", peer.get("ip"));
+      }
+    }
+  }
+
+  public void listen() {
+    try (ServerSocket server = new ServerSocket(6881)) {
+      while (true) {
+        Socket sock = server.accept();
+        System.out.println("accpted peer");
+        BencodePeer peerCon = new BencodePeer(sock, infoHash, id.getBytes(), this, mgr);
+        connections.add(peerCon);
+        incThreads();
+        executor.submit(peerCon);
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
     }
   }
 
